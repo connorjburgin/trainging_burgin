@@ -7,3 +7,110 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+```{r warning=FALSE, message=FALSE}
+#loaded packages
+library(dplyr)
+library(tidyr)
+library(readr)
+```
+
+
+```{r}
+#loaded salmon data
+catch_original <- read_csv("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1")
+```
+
+```{r}
+#removed the 'All' and 'notesRegCode' from "cartch_original"
+catch_data <- catch_original %>% 
+  select(-All, -notesRegCode)
+catch_data
+```
+
+```{r}
+#summarized catch data, which showed Chinook as a character rather than a number
+summary(catch_data)
+```
+
+```{r}
+# made column Chinook numeric
+catch_clean <- catch_data %>% 
+  mutate(Chinook = as.numeric(Chinook))
+catch_clean
+```
+
+```{r}
+#assigned NA's in Chinook to a value
+i <- which(is.na(catch_clean$Chinook))
+```
+
+```{r}
+#identifying what was in the NA row in the original data
+catch_original[i,]
+```
+
+```{r}
+#removed the 'I' from the Chinook Column in the Salmon data by turning it into a '1'
+catch_clean <- catch_data %>% 
+  mutate(Chinook = ifelse(Chinook == "I", 1, Chinook)) %>% 
+  mutate(Chinook = as.numeric(Chinook))
+catch_clean
+```
+
+```{r}
+#making the table 'long' rather than 'wide'
+catch_long <- catch_clean %>% 
+  pivot_longer(cols = -c(Region, Year), names_to = "species", values_to = "catch")
+catch_long
+
+#making the 'long' table 'wide' again
+catch_wide <- catch_long %>% 
+  pivot_wider(names_from = "species", values_from = "catch")
+catch_wide
+```
+
+```{r}
+#renaming "catch" to equal "catch_thousands"
+catch_long <- catch_long %>% 
+  rename(catch_thousands = catch)
+catch_long
+```
+
+```{r}
+#creating a column with the value by of 'catch_thousands' multiplied by 1000, named 'catch' and deleting 'catch_thousands'
+catch_long <- catch_long %>% 
+  mutate(catch = catch_thousands * 1000) %>% 
+  select(-catch_thousands)
+catch_long
+```
+
+```{r}
+#grouped the table by the 'Region' column and summarized the data by region based on the 'catch' column; arrange was added later to arrange by 'catch_mean' in a descending order
+mean_by_region <- catch_long %>%
+  group_by(Region) %>% 
+  summarise(catch_mean = mean(catch)) %>% 
+  arrange(desc(catch_mean))
+mean_by_region
+```
+
+```{r}
+#filtering the long table down to just the rcords from the 'SSE' region in the 'Region' column
+SSE_catch <- catch_long %>% 
+  filter(Region == "SSE")
+SSE_catch
+```
+
+```{r}
+#uploaded 'region_defs' data and selecting for the 'code' and 'mgmtArea' columns
+region_defs <- read_csv ("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.303.1") %>% 
+  select(code, mgmtArea)
+region_defs
+```
+
+```{r}
+#joining the region codes ('Region' in catch_long and 'code' in region_defs) between teh salmon and region definition tables using a left join, which means it will join to the left value (the salmon data here)
+catch_joined <- left_join(catch_long, region_defs, by = c("Reigon" = "code"))
+catch_joined
+```
+
